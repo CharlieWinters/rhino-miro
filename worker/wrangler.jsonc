@@ -16,7 +16,7 @@
 		// Must match the redirect URI registered on the Miro app: <PUBLIC_BASE_URL>/callback
 		"PUBLIC_BASE_URL": "https://rhino-miro.seanwinters.app",
 		// Client ID from the Miro developer dashboard (not secret).
-		"MIRO_CLIENT_ID": ""
+		"MIRO_CLIENT_ID": "3458764686487936769"
 	}
 	// Secrets (set with `npx wrangler secret put <NAME>`, never in this file):
 	//   MIRO_CLIENT_SECRET  from the Miro developer dashboard.
