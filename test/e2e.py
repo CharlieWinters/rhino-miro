@@ -64,6 +64,8 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("content-length") or 0)
         body = self.rfile.read(n) if n else b""
         M.log.append((self.command, url.path))
+        if self.headers.get("user-agent", "").startswith("Python-urllib"):  # Cloudflare blocks this (error 1010)
+            return self.reply(403, {"message": "error code: 1010"})
 
         if url.path == "/oauth/authorize":
             assert q["client_id"] == CLIENT_ID and q["response_type"] == "code"
@@ -178,7 +180,7 @@ def browser(url):
     """Follows the whole redirect chain like a browser would, on another thread (the loopback is served by ours)."""
     def go():
         try:
-            urllib.request.urlopen(url, timeout=10).read()
+            urllib.request.urlopen(urllib.request.Request(url, headers={"user-agent": "Mozilla/5.0"}), timeout=10).read()
         except Exception as err:  # noqa: BLE001 - surfaced through sign_in's timeout
             print("browser error:", err)
     threading.Thread(target=go, daemon=True).start()
@@ -235,8 +237,8 @@ def main():
                     return None
                 return super().redirect_request(req, fp, code, msg, headers, newurl)
         try:
-            urllib.request.build_opener(NoFollow).open(base + "/login?" + urllib.parse.urlencode(
-                {"port": 5555, "state": "s" * 24, "code_challenge": challenge}), timeout=10)
+            urllib.request.build_opener(NoFollow).open(urllib.request.Request(base + "/login?" + urllib.parse.urlencode(
+                {"port": 5555, "state": "s" * 24, "code_challenge": challenge}), headers={"user-agent": "Mozilla/5.0"}), timeout=10)
         except urllib.error.HTTPError:
             pass
         ticket = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(captured["url"]).query))["ticket"]

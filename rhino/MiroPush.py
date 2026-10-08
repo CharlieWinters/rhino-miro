@@ -35,6 +35,8 @@ DOC_SECTION = "MiroPush"
 CAPTURE_WIDTH_PX = 1920
 BOARD_WIDTH = 960  # board units for a newly created image
 SIGN_IN_TIMEOUT_S = 300
+# Cloudflare's browser check rejects the default "Python-urllib" agent (403, error 1010).
+USER_AGENT = "MiroPush/0.1 (Rhino 8)"
 
 
 class MiroError(Exception):
@@ -66,7 +68,7 @@ def http_request(method, url, headers=None, body=None, timeout=60):
     global _SSL
     if _SSL is None:
         _SSL = _ssl_context()
-    req = urllib.request.Request(url, data=body, method=method, headers=headers or {})
+    req = urllib.request.Request(url, data=body, method=method, headers=dict(headers or {}, **{"user-agent": USER_AGENT}))
     try:
         with urllib.request.urlopen(req, timeout=timeout, context=_SSL if url.startswith("https") else None) as res:
             status, raw = res.status, res.read()
