@@ -55,7 +55,7 @@ Worker acts as a broker:
 `MiroPush`, then:
 
 - **Enter**: push the active view. The first time, it asks you to sign in and for a board URL.
-- **Board**: switch to a different board. Image IDs are kept per document, per view.
+- **Board**: switch to a different board, then push. Image IDs are kept per document, per view.
 - **SignIn** / **SignOut**: SignOut removes the tokens from the keychain.
 
 The board and item IDs are saved in the `.3dm` file (document strings, section `MiroPush`), so
@@ -77,9 +77,19 @@ This runs the real Worker under `wrangler dev` against a mock Miro (OAuth and RE
 
 It needs no real accounts.
 
-**Not covered**, because Rhino isn't installed on the dev machine: the Rhino glue
-(`_capture_png`, the prompts, document strings) and `keyring`/`certifi` inside Rhino's CPython.
-The macOS fallback (`-ViewCaptureToFile` with options) is written from the docs and untested.
+**Verified in Rhino 8 on macOS (2026-10-08)**, by driving the running Rhino with
+`/Applications/Rhino 8.app/Contents/Resources/bin/rhinocode script <file>.py`:
+
+- sign-in, and `keyring`/`certifi` inside Rhino's CPython
+- `ViewCapture` + `System.Drawing` capture (the `-ViewCaptureToFile` fallback has never been needed)
+- create, then re-push in place
+
+**Miro API quirks found on the live API:**
+
+- The multipart `data` part must have no filename, or Miro returns a 500 with "Failed to convert 'data'".
+- Replacing an image's file resets it to its pixel size unless a `geometry.width` is sent with it.
+- A JSON `PATCH` on an image silently ignores `geometry`.
+- Cloudflare blocks Python's default `Python-urllib` user agent (403, error 1010), so the script sends its own.
 
 ## Before colleagues use it
 

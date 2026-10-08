@@ -230,19 +230,23 @@ class MiroClient:
                 tokens = self._refresh(tokens)
                 continue
             if status >= 400:
-                raise MiroError("Miro %s %s failed (%s): %s" % (method, path, status, (data or {}).get("message", "")), status)
+                raise MiroError("Miro %s %s failed (%s): %s" % (method, path, status, _error_text(data)), status)
             return data
 
     def board(self, board_id):
         return self.request("GET", "/v2/boards/%s" % _q(board_id))
 
     def _image_files(self, png, data):
-        # Miro ignores `data` unless the part is typed application/json.
-        return [("data", "data.json", "application/json", json.dumps(data).encode("utf-8")),
+        # `data` must be typed application/json (else position is ignored) and must NOT have a
+        # filename (else Miro reads it as a file and fails with a 500 "Failed to convert 'data'").
+        return [("data", None, "application/json", json.dumps(data).encode("utf-8")),
                 ("resource", "view.png", "image/png", png)]
 
     def create_image(self, board_id, png, data):
         return self.request("POST", "/v2/boards/%s/images" % _q(board_id), files=self._image_files(png, data))
+
+    def get_image(self, board_id, item_id):
+        return self.request("GET", "/v2/boards/%s/images/%s" % (_q(board_id), _q(item_id)))
 
     def update_image(self, board_id, item_id, png, data):
         return self.request("PATCH", "/v2/boards/%s/images/%s" % (_q(board_id), _q(item_id)), files=self._image_files(png, data))
@@ -258,6 +262,11 @@ class MiroClient:
     def update_text(self, board_id, item_id, content):
         return self.request("PATCH", "/v2/boards/%s/texts/%s" % (_q(board_id), _q(item_id)),
                             payload={"data": {"content": content}})
+
+
+def _error_text(data):
+    data = data or {}
+    return data.get("message") or data.get("detail") or data.get("title") or ""
 
 
 def _q(s):
@@ -282,7 +291,9 @@ def push_view(client, state, view_name, png, width_px, height_px, caption):
     image = None
     if entry.get("image"):
         try:
-            image = client.update_image(board_id, entry["image"], png, data)
+            # Replacing the file resets the image to its pixel size, so keep the width it has now.
+            width = (client.get_image(board_id, entry["image"]).get("geometry") or {}).get("width")
+            image = client.update_image(board_id, entry["image"], png, dict(data, geometry={"width": width}) if width else data)
         except MiroError as err:
             if err.status != 404:  # deleted on the board: fall through and create a new one
                 raise
@@ -375,7 +386,7 @@ def _ask_action():
     go = Rhino.Input.Custom.GetOption()
     go.SetCommandPrompt("Press Enter to push the active view to Miro")
     go.AcceptNothing(True)
-    names = ["Board", "SignIn", "SignOut"]
+    names = ["Board", "SignIn", "SignOut"]  # Board = pick another board, then push
     indices = {go.AddOption(n): n for n in names}
     res = go.Get()
     if res == Rhino.Input.GetResult.Nothing:
@@ -423,10 +434,8 @@ def main():
             board = client.board(board_id)
             if board_id != state.get("board_id"):
                 state = {"board_id": board_id}  # item IDs belong to the old board
-            say("pushing to board '%s'." % board.get("name", board_id))
+            say("board: '%s'." % board.get("name", board_id))
             _save_doc_state(doc, state)
-            if action == "Board":
-                return
 
         view = doc.Views.ActiveView
         view_name = view.ActiveViewport.Name

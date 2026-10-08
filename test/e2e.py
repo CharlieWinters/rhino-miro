@@ -100,8 +100,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"id": BOARD, "name": "Test board"})
         kind = parts[3]
         item_id = parts[4] if len(parts) > 4 else None
+        if kind == "images" and self.command == "GET" and item_id:
+            if item_id not in M.items:
+                return self.reply(404, {"message": "item not found"})
+            return self.reply(200, {"id": item_id, "geometry": {"width": M.items[item_id].get("width", 960.0)}})
         if kind == "images":
             fields = self._multipart(body)
+            if fields["data"][2]:  # real Miro: a filename makes it a file part and it 500s
+                return self.reply(500, {"title": "Internal Server Error", "detail": "Failed to convert 'data'"})
             assert fields["data"][0] == "application/json", fields["data"][0]
             assert fields["resource"][0] == "image/png"
             data = json.loads(fields["data"][1])
@@ -128,7 +134,8 @@ class Handler(BaseHTTPRequestHandler):
     def _multipart(self, body):
         msg = email.parser.BytesParser(policy=email.policy.HTTP).parsebytes(
             b"content-type: " + self.headers["content-type"].encode() + b"\r\n\r\n" + body)
-        return {p.get_param("name", header="content-disposition"): (p.get_content_type(), p.get_payload(decode=True))
+        return {p.get_param("name", header="content-disposition"):
+                (p.get_content_type(), p.get_payload(decode=True), p.get_param("filename", header="content-disposition"))
                 for p in msg.iter_parts()}
 
     do_GET = do_POST = do_PATCH = route
@@ -267,6 +274,9 @@ def main():
         state, image2 = mp.push_view(client, state, "Perspective", png, 1920, 1080, "a.3dm · Perspective · later")
         check("re-push updates the same image", image2["id"] == image["id"] and M.items[image["id"]]["updates"] == 1 and len(M.items) == before)
         check("re-push keeps the image where it is (no position sent)", "position" not in M.items[image["id"]]["last"])
+        M.items[image["id"]]["width"] = 640.0  # user resized it on the board
+        mp.push_view(client, state, "Perspective", png, 1920, 1080, "a.3dm · Perspective · later")
+        check("re-push keeps the width set on the board", M.items[image["id"]]["last"]["geometry"] == {"width": 640.0}, M.items[image["id"]]["last"])
         check("re-push updates the caption", cap["last"]["data"]["content"].endswith("later"))
 
         # Another view goes next to it
