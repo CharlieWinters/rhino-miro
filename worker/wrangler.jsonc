@@ -1,0 +1,24 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "rhino-miro-auth",
+	"main": "src/index.js",
+	"compatibility_date": "2026-09-01",
+	"observability": {
+		"enabled": true
+	},
+	// Served only on the custom domain below.
+	"workers_dev": false,
+	"preview_urls": false,
+	"routes": [
+		{ "pattern": "rhino-miro.seanwinters.app", "custom_domain": true }
+	],
+	"vars": {
+		// Must match the redirect URI registered on the Miro app: <PUBLIC_BASE_URL>/callback
+		"PUBLIC_BASE_URL": "https://rhino-miro.seanwinters.app",
+		// Client ID from the Miro developer dashboard (not secret).
+		"MIRO_CLIENT_ID": ""
+	}
+	// Secrets (set with `npx wrangler secret put <NAME>`, never in this file):
+	//   MIRO_CLIENT_SECRET  from the Miro developer dashboard.
+	//   TOKEN_KEY           32+ random bytes, base64. Seals the login flow and token tickets.
+}
