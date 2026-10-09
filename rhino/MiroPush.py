@@ -341,14 +341,9 @@ def _capture_png(view, width_px):
     try:
         try:
             import System
-            vc = Rhino.Display.ViewCapture()
-            vc.Width, vc.Height = width_px, height_px
-            vc.ScaleScreenItems = False
-            vc.DrawAxes = False
-            vc.DrawGrid = False
-            vc.DrawGridAxes = False
-            vc.TransparentBackground = False
-            bitmap = vc.CaptureToBitmap(view)
+            # RhinoView.CaptureToBitmap honours the display mode; ViewCapture on macOS can draw
+            # a Shaded view as wireframe when the document's window isn't in front.
+            bitmap = view.CaptureToBitmap(System.Drawing.Size(width_px, height_px), view.ActiveViewport.DisplayMode)
             if bitmap is None:
                 raise RuntimeError("CaptureToBitmap returned nothing")
             bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png)

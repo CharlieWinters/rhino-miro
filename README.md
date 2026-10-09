@@ -81,7 +81,7 @@ It needs no real accounts.
 `/Applications/Rhino 8.app/Contents/Resources/bin/rhinocode script <file>.py`:
 
 - sign-in, and `keyring`/`certifi` inside Rhino's CPython
-- `ViewCapture` + `System.Drawing` capture (the `-ViewCaptureToFile` fallback has never been needed)
+- `RhinoView.CaptureToBitmap(size, displayMode)` capture. `ViewCapture` can draw Shaded or Arctic as wireframe on macOS. The `-ViewCaptureToFile` fallback has never been needed.
 - create, then re-push in place
 
 **Miro API quirks found on the live API:**
