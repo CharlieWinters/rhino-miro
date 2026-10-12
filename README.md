@@ -91,7 +91,7 @@ It needs no real accounts.
 - A JSON `PATCH` on an image silently ignores `geometry`.
 - Cloudflare blocks Python's default `Python-urllib` user agent (403, error 1010), so the script sends its own.
 
-## Before colleagues use it
+## Before other people use it
 
-Have #security_stream look at the Worker. It holds the Miro client secret as a Cloudflare
+Have your security team review the Worker. It holds the Miro client secret as a Cloudflare
 secret and relays refresh tokens.
