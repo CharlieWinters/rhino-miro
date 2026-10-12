@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "OAuth broker for the Rhino MiroPush command: holds the Miro client secret.",
+  "description": "POC OAuth broker for the Rhino MiroPush command: holds the Miro client secret.",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
-    "test": "node test/run.mjs"
+    "test": "cd .. && python3 -I test/e2e.py",
+    "deploy:local": "wrangler deploy -c wrangler.local.jsonc"
   },
   "devDependencies": {
     "wrangler": "^4.105.0"

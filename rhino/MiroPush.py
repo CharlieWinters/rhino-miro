@@ -2,11 +2,17 @@
 # r: keyring, certifi
 """MiroPush: send the active Rhino viewport to a Miro board as an image.
 
+PROOF OF CONCEPT. Not a supported product: no warranty, minimal error handling, and the auth
+Worker it depends on has not been through a security review. Use it to evaluate the idea.
+
 Run it from Rhino 8 (ScriptEditor, or an alias, see README). First run signs you in to
 Miro in the browser and asks for a board URL. Pushing the same view again replaces the
 image already on the board, so it keeps its position, size and any comments.
 
-Sign-in goes through the rhino-miro auth Worker, which holds the Miro app's client secret.
+Sign-in goes through your deployment of the rhino-miro auth Worker (worker/ in this repo),
+which holds the Miro app's client secret. Point the script at it with ~/.miropush.json:
+    {"auth_url": "https://rhino-miro-auth.<your-subdomain>.workers.dev"}
+or the MIRO_RHINO_AUTH_URL environment variable.
 Tokens are kept in the OS keychain (macOS Keychain / Windows Credential Manager), never in
 the .3dm file or on disk.
 """
@@ -27,7 +33,21 @@ import urllib.request
 import uuid
 import webbrowser
 
-AUTH_BASE = os.environ.get("MIRO_RHINO_AUTH_URL", "https://rhino-miro.seanwinters.app").rstrip("/")
+CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".miropush.json")
+
+
+def _load_auth_base():
+    url = os.environ.get("MIRO_RHINO_AUTH_URL")
+    if not url:
+        try:
+            with open(CONFIG_PATH) as f:
+                url = json.load(f).get("auth_url")
+        except (OSError, ValueError):
+            url = None
+    return (url or "").rstrip("/")
+
+
+AUTH_BASE = _load_auth_base()
 API_BASE = os.environ.get("MIRO_RHINO_API_URL", "https://api.miro.com").rstrip("/")
 KEYRING_SERVICE = "rhino-miro"
 KEYRING_ENTRY = "tokens"
@@ -47,6 +67,13 @@ class MiroError(Exception):
 
 class NotSignedIn(MiroError):
     pass
+
+
+def _auth_base():
+    if not AUTH_BASE:
+        raise MiroError('No auth Worker configured. Create %s containing '
+                        '{"auth_url": "https://<your-worker>"} (see README).' % CONFIG_PATH)
+    return AUTH_BASE
 
 
 # ---------------------------------------------------------------- HTTP
@@ -165,7 +192,7 @@ def sign_in(store, open_browser=webbrowser.open, pump=None, timeout=SIGN_IN_TIME
     server.timeout = 0.25
     try:
         port = server.server_address[1]
-        open_browser("%s/login?%s" % (AUTH_BASE, urllib.parse.urlencode(
+        open_browser("%s/login?%s" % (_auth_base(), urllib.parse.urlencode(
             {"port": port, "state": state, "code_challenge": challenge})))
         deadline = time.time() + timeout
         while not result:
@@ -179,7 +206,7 @@ def sign_in(store, open_browser=webbrowser.open, pump=None, timeout=SIGN_IN_TIME
 
     if "ticket" not in result:
         raise MiroError("Miro sign-in failed: %s" % result.get("error", "unknown error"))
-    status, tokens = post_json(AUTH_BASE + "/redeem", {"ticket": result["ticket"], "code_verifier": verifier})
+    status, tokens = post_json(_auth_base() + "/redeem", {"ticket": result["ticket"], "code_verifier": verifier})
     if status != 200 or not tokens or not tokens.get("access_token"):
         raise MiroError("Could not complete sign-in: %s" % (tokens or {}).get("error_description", status), status)
     store.save(tokens)
@@ -205,7 +232,7 @@ class MiroClient:
         if not tokens.get("refresh_token"):
             self.store.clear()
             raise NotSignedIn("Miro session expired, sign in again.")
-        status, fresh = post_json(AUTH_BASE + "/refresh", {"refresh_token": tokens["refresh_token"]})
+        status, fresh = post_json(_auth_base() + "/refresh", {"refresh_token": tokens["refresh_token"]})
         if status == 401:
             self.store.clear()
             raise NotSignedIn("Miro session expired, sign in again.")

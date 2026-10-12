@@ -1,6 +1,9 @@
 /**
  * rhino-miro auth broker: holds the Miro app's client secret so the Rhino script doesn't have to.
  *
+ * PROOF OF CONCEPT. Not reviewed for production use: no rate limiting, no abuse protection,
+ * and it relays refresh tokens for anyone who has one. Review it before others rely on it.
+ *
  *   Rhino --opens browser--> /login --302--> Miro consent --302--> /callback
  *         (Worker swaps the code for tokens, seals them into a ticket bound to Rhino's PKCE challenge)
  *   /callback --302--> http://127.0.0.1:<port>/callback?ticket=...   (Rhino's loopback listener)
@@ -158,7 +161,7 @@ export default {
       if (!cfg.clientId || !cfg.clientSecret || !cfg.tokenKey) return json({ error: "server_not_configured" }, 503);
       switch (route) {
         case "GET /":
-          return page("Rhino → Miro", "Sign-in broker for the MiroPush command in Rhino. Nothing to do here.");
+          return page("Rhino → Miro", "Proof-of-concept sign-in broker for the MiroPush command in Rhino. Nothing to do here.");
         case "GET /login":
           return await login(url, cfg);
         case "GET /callback":

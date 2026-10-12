@@ -6,19 +6,22 @@
 	"observability": {
 		"enabled": true
 	},
-	// Served only on the custom domain below.
-	"workers_dev": false,
+	// Deploys to https://rhino-miro-auth.<your-subdomain>.workers.dev.
+	// To serve it on your own domain instead, add for example:
+	//   "routes": [{ "pattern": "rhino-miro.example.com", "custom_domain": true }]
+	// and set PUBLIC_BASE_URL to match. Keep personal settings in an untracked
+	// wrangler.local.jsonc and deploy it with `npm run deploy:local`.
+	"workers_dev": true,
 	"preview_urls": false,
-	"routes": [
-		{ "pattern": "rhino-miro.seanwinters.app", "custom_domain": true }
-	],
 	"vars": {
-		// Must match the redirect URI registered on the Miro app: <PUBLIC_BASE_URL>/callback
-		"PUBLIC_BASE_URL": "https://rhino-miro.seanwinters.app",
+		// Public URL of this Worker. Empty = use the URL each request arrives on.
+		// The Miro app's redirect URI must be <PUBLIC_BASE_URL>/callback.
+		"PUBLIC_BASE_URL": "",
 		// Client ID from the Miro developer dashboard (not secret).
-		"MIRO_CLIENT_ID": "3458764686487936769"
+		"MIRO_CLIENT_ID": ""
 	}
 	// Secrets (set with `npx wrangler secret put <NAME>`, never in this file):
 	//   MIRO_CLIENT_SECRET  from the Miro developer dashboard.
 	//   TOKEN_KEY           32+ random bytes, base64. Seals the login flow and token tickets.
+	//                       e.g. `openssl rand -base64 32 | npx wrangler secret put TOKEN_KEY`
 }

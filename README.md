@@ -1,5 +1,10 @@
 # Rhino → Miro (MiroPush)
 
+> **Proof of concept only.** This is an experiment to show that Rhino viewports can be pushed to
+> Miro boards. It is not a supported product, not maintained, and has not had a security review.
+> Don't rely on it for production work or share your deployment with other people without
+> reviewing it first.
+
 A Rhino 8 command that sends the active viewport to a Miro board as an image. Pushing the
 same view again replaces that image in place, so it keeps its position, size and comments.
 A small caption under each image shows file · view · time.
@@ -7,7 +12,7 @@ A small caption under each image shows file · view · time.
 ```
 Rhino (rhino/MiroPush.py) ──REST──▶ api.miro.com            (images, texts)
         │
-        └─ sign-in / refresh ─▶ rhino-miro.seanwinters.app  (worker/, Cloudflare)
+        └─ sign-in / refresh ─▶ your auth Worker            (worker/, Cloudflare)
                                    holds the Miro client secret, stores nothing
 ```
 
@@ -30,22 +35,38 @@ Worker acts as a broker:
 
 ## One-time setup
 
-1. **Miro app.** In Miro, open Profile → Settings → Your apps → Create new app, on a dev team.
+You need a Cloudflare account (the free plan is enough) and a Miro team where you can create apps.
+
+1. **Deploy the Worker.**
+   ```sh
+   cd worker
+   npm install
+   npm run deploy                     # prints https://rhino-miro-auth.<your-subdomain>.workers.dev
+   openssl rand -base64 32 | npx wrangler secret put TOKEN_KEY
+   ```
+   Call that URL `<worker>` below. To use your own domain instead, see the comments in
+   `worker/wrangler.jsonc`.
+2. **Create the Miro app.** In Miro, open Profile → Settings → Your apps → Create new app, on a dev team.
    - Leave **Expire user authorization token** on. You can't change this after the app is created.
-   - Redirect URI: `https://rhino-miro.seanwinters.app/callback`
+   - Redirect URI: `<worker>/callback`
    - Scopes: `boards:read`, `boards:write`
    - People on other teams can only sign in after you turn on **Distribute app** in the app
      settings. This is not a Marketplace listing.
-2. **Worker config.** Put the app's client ID in `worker/wrangler.jsonc` → `MIRO_CLIENT_ID`. Then
-   run this in your own terminal and paste the client secret at the prompt, not into chat:
+3. **Give the Worker the Miro credentials.** Put the app's client ID in `worker/wrangler.jsonc` →
+   `MIRO_CLIENT_ID` (or in an untracked `wrangler.local.jsonc`, deployed with `npm run deploy:local`).
+   Then paste the client secret at the prompt:
    ```sh
-   cd worker
    npx wrangler secret put MIRO_CLIENT_SECRET
    npm run deploy
-   curl -s https://rhino-miro.seanwinters.app/health   # → {"ok":true,"configured":true}
+   curl -s <worker>/health            # → {"ok":true,"configured":true}
    ```
-   `TOKEN_KEY` is already set. If you rotate it, only sign-ins in progress at that moment fail.
-3. **Rhino 8.**
+   If you rotate `TOKEN_KEY`, only sign-ins in progress at that moment fail.
+4. **Point the script at your Worker.** Create `~/.miropush.json`:
+   ```json
+   {"auth_url": "<worker>"}
+   ```
+   (or set the `MIRO_RHINO_AUTH_URL` environment variable).
+5. **Rhino 8.**
    - Open `rhino/MiroPush.py` in the ScriptEditor and Run it once. The `# r: keyring, certifi`
      line installs those two packages.
    - Optionally add an alias in Options → Aliases: `MiroPush` → `_-ScriptEditor _Run "<path>/MiroPush.py"`
@@ -64,7 +85,7 @@ re-opening the file and pushing again updates the same images.
 ## Tests
 
 ```sh
-python3 -I test/e2e.py
+python3 -I test/e2e.py      # or: cd worker && npm test
 ```
 
 This runs the real Worker under `wrangler dev` against a mock Miro (OAuth and REST) and covers:

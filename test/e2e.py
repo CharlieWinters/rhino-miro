@@ -332,6 +332,23 @@ def main():
                            ("uXjVTEST1234=", BOARD), ("https://example.com/nope", None), ("", None)]:
             check("parse_board_id(%r)" % text[:40], mp.parse_board_id(text) == want, mp.parse_board_id(text))
 
+        # Auth Worker URL comes from the env var, else ~/.miropush.json, else a clear error
+        import tempfile
+        probe = ("import sys, json; sys.path.insert(0, %r); import MiroPush as mp; "
+                 "print(json.dumps(mp.AUTH_BASE)); mp._auth_base()") % os.path.join(ROOT, "rhino")
+        home = tempfile.mkdtemp()
+        env = {k: v for k, v in os.environ.items() if k != "MIRO_RHINO_AUTH_URL"}
+        env["HOME"] = home
+        r = subprocess.run([sys.executable, "-I", "-c", probe], env=env, capture_output=True, text=True)
+        check("no config: clear error naming ~/.miropush.json", r.returncode != 0 and ".miropush.json" in r.stderr, r.stderr[-300:])
+        with open(os.path.join(home, ".miropush.json"), "w") as f:
+            json.dump({"auth_url": "https://worker.example.com/"}, f)
+        r = subprocess.run([sys.executable, "-I", "-c", probe], env=env, capture_output=True, text=True)
+        check("config file sets the auth URL", r.returncode == 0 and json.loads(r.stdout) == "https://worker.example.com", r.stdout + r.stderr[-300:])
+        env["MIRO_RHINO_AUTH_URL"] = "https://env.example.com"
+        r = subprocess.run([sys.executable, "-I", "-c", probe], env=env, capture_output=True, text=True)
+        check("env var wins over the config file", json.loads(r.stdout) == "https://env.example.com", r.stdout)
+
         print("\n%d checks passed" % passed)
     finally:
         proc.terminate()
